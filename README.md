@@ -101,13 +101,33 @@ class RagPipeline(Protocol):
     def answer(self, question: str) -> Answer: ...   # text + retrieved chunk ids
 ```
 
-The reference pipeline ships in-repo so the tool runs with no external stack.
+Two implementations ship in-repo, and **CI asserts they agree**:
+
+| Pipeline | How it is built | `--pipeline` |
+|---|---|---|
+| reference | plain Python, no external stack | `reference` (default) |
+| LangGraph | a compiled `StateGraph`: retrieve → build context → generate | `langgraph` |
+
+```bash
+pip install -e ".[langgraph]"
+mirage scan fixtures/false_confidence --pipeline langgraph
+```
+
+Both answer the same questions with the same text, the same retrieved chunks and
+the same sensitivity score — `test_graph_answers_identically_to_the_reference_pipeline`
+and a CI job pin it. If they ever diverge, a measurement taken through one would
+not describe the other.
+
+LangGraph is an **optional extra**: mirage's hard dependencies stay numpy and
+scikit-learn, and the tool still runs offline. Asking for the adapter without the
+extra installed **raises** rather than falling back — a report must name the
+pipeline it actually measured.
 
 ## Install and run
 
 ```bash
 pip install -e ".[dev]"
-pytest -q                                             # 28 tests
+pytest -q                                             # 28 tests (33 with the extra)
 mirage scan fixtures/false_confidence                 # grounded
 mirage scan fixtures/false_confidence --ungrounded    # the false-confidence demo
 mirage test fixtures/false_confidence --threshold 0.60
@@ -160,6 +180,7 @@ src/mirage/
   engine.py      baseline -> calibrate -> mutate -> re-run -> score
   outcomes.py    outcomes, sensitivity, per-operator breakdown
   report.py      console + HTML
+  adapters/      alternative RagPipeline implementations (LangGraph)
   cli.py         mirage scan | mirage test
 ```
 

@@ -19,15 +19,22 @@ def _load(project: Path) -> tuple[dict[str, str], list[str]]:
     return docs, qs
 
 
-def _pipeline(args) -> ReferencePipeline:
+def _pipeline(args):
     parametric: dict[str, str] = {}
     p = Path(args.project) / "parametric.json"
     if args.ungrounded and p.exists():
         parametric = json.loads(p.read_text(encoding="utf-8"))
     if args.model == "anthropic":
         from .llm import AnthropicModel
-        return ReferencePipeline(model=AnthropicModel())
-    return ReferencePipeline(model=ReplayModel(parametric))
+        model = AnthropicModel()
+    else:
+        model = ReplayModel(parametric)
+    if args.pipeline == "langgraph":
+        # Raises if the optional extra is absent. Never falls back: the report
+        # names the pipeline it measured, so it must have measured that one.
+        from .adapters.langgraph_pipeline import LangGraphPipeline
+        return LangGraphPipeline(model=model)
+    return ReferencePipeline(model=model)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -38,6 +45,9 @@ def main(argv: list[str] | None = None) -> int:
         s = sub.add_parser(name)
         s.add_argument("project")
         s.add_argument("--model", default="replay", choices=["replay", "anthropic"])
+        s.add_argument("--pipeline", default="reference",
+                       choices=["reference", "langgraph"],
+                       help="which RagPipeline implementation to measure")
         s.add_argument("--k", type=int, default=5, help="calibration runs per question")
         s.add_argument("--ungrounded", action="store_true",
                        help="use the parametric-memory model — the false-confidence demo")

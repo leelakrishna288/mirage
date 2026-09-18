@@ -29,3 +29,25 @@ jobs:
       - uses: actions/upload-artifact@v5
         if: always()
         with: { name: mirage-report, path: mirage-out/ }
+
+  langgraph-equivalence:
+    # The RagPipeline protocol is a claim; this job is the evidence. The same
+    # questions are answered through a compiled LangGraph StateGraph and must
+    # produce identical answers, retrieval and sensitivity scores.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev,langgraph]"
+      - name: The graph must answer identically to the reference pipeline
+        run: pytest tests/test_langgraph_adapter.py -q
+      - name: And score identically end to end
+        run: |
+          mirage scan fixtures/false_confidence --pipeline langgraph | tee lg.txt
+          mirage scan fixtures/false_confidence                      | tee ref.txt
+          grep "EVIDENCE SENSITIVITY" lg.txt  > lg.score
+          grep "EVIDENCE SENSITIVITY" ref.txt > ref.score
+          diff lg.score ref.score || (echo "the two pipelines disagree"; exit 1)

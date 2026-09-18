@@ -7,6 +7,9 @@ dependencies = ["numpy>=1.24", "scikit-learn>=1.3"]
 
 [project.optional-dependencies]
 dev = ["pytest>=7"]
+# Optional. mirage's hard dependencies stay numpy + scikit-learn so the tool
+# runs offline with no extras; this only adds the alternative pipeline adapter.
+langgraph = ["langgraph>=0.2"]
 
 [project.scripts]
 mirage = "mirage.cli:main"

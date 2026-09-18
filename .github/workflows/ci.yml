@@ -1,0 +1,31 @@
+name: build
+on:
+  push: { branches: [main] }
+  pull_request:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        python: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e ".[dev]"
+      - name: Self-tests
+        run: pytest -q
+      # The whole demo runs on the replay model: no API key, no network, no cost.
+      - name: Grounded pipeline must pass its own gate
+        run: mirage test fixtures/false_confidence --threshold 0.60
+      - name: Ungrounded pipeline must FAIL the gate
+        run: |
+          if mirage test fixtures/false_confidence --ungrounded --threshold 0.60; then
+            echo "the ungrounded pipeline passed the gate - the tool is not working"; exit 1
+          fi
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with: { name: mirage-report, path: mirage-out/ }
